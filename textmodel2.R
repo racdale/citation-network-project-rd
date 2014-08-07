@@ -1,79 +1,56 @@
 setwd('~/Dropbox/cogsci_interdisciplinarity/citation-network-project-master')
 # NB: needs processing in hbhat4000's citation-network-project-master
 
-cos.sim = function(ix) {
-    A = X[ix[1],]
-    B = X[ix[2],]
-    return(sum(A*B)/sqrt(sum(A^2)*sum(B^2)))
-}   
-# beautiful code to build dissimilarity matrix, using cos.sim above:
-# http://stats.stackexchange.com/questions/31565/is-there-an-r-function-that-will-compute-the-cosine-dissimilarity-matrix
-
 # clear all memory
 rm(list=ls(all=TRUE))
 
-# load text mining library
-library(tm)
-
-# load title data
-load('extract2.RData') # needs processing in hbhat4000's citation-network-project-master
-
-# create corpus
-#corpus = Corpus(VectorSource(c(title$name,title$abstract)))
-corpus = Corpus(VectorSource(title$abstract))
-# convert to lowercase
-corpus = tm_map(corpus, tolower)
-# remove stopwords
-corpus = tm_map(corpus, removeWords, stopwords("english"))
-# eliminate extra whitespace
-corpus = tm_map(corpus, stripWhitespace)
-# eliminate punctuation
-removepunct = function(x) { return(gsub("[[:punct:]]","",x)) }
-corpus = tm_map(corpus, removepunct)
-# eliminate numbers
-removenum = function(x) { return(gsub("[0-9]","",x)) }
-corpus = tm_map(corpus, removenum)
-
-# make term-document matrix
-tXd = DocumentTermMatrix(corpus) 
+source('load_text_materials.R')
+source('cosine_similarity_matrix.R')
+source('author_cosine_by_journal.R')
+source('journal_cosine_by_content.R')
 
 # convert to sparse matrix
 library('Matrix')
-tXd.mat = sparseMatrix(tXd$i,tXd$j,x=tXd$v) # removes col's with 0's... need to fix
-save(tXd.mat,tXd,file="tXd.Rdata")
-#load('tXd.Rdata')
+tXd.mat = sparseMatrix(tXd$i,tXd$j,x=tXd$v,dims=c(tXd$nrow,tXd$ncol)) # removes col's with 0's... need to fix
+#save(tXd.mat,tXd,file="tXd.Rdata")
+load('tXd.Rdata')
 
 # tXd.mat too big for non-sparse SVD; use irlba
-S = irlba(tXd.mat,nu=25,nv=25) # very slow beyond 30 or so
+library(irlba)
+S <<- irlba(tXd.mat,nu=25,nv=25) # very slow beyond 30 or so
 
-getjournalcosines = function(jid) {
-    print(journal[jid,]$name)
-    articles = which(title$JID==jid)
-    artids = title$TID[articles]
-    cosines = c()
-    for (j in artids) { # loop through all articles for this journal
-        print(paste('processing',which(artids==j),'of',length(artids),'articles'))
-        auths = comb$AID[comb$TID==j] # get the authors of this title
-        auths = auths[author[auths,]$name!=""]        
-        if (length(auths)>1) { # only with plurality of authors
-          authtitles = unique(comb$TID[comb$AID %in% auths]) # get all the authors' titles
-          X <<- S$v[authtitles,]
-          n = nrow(X) 
-          cmb = expand.grid(i=1:n, j=1:n) 
-          C = matrix(apply(cmb,1,cos.sim),n,n) # get all pairwise cosine similarity measures
-          cos.range = c(mean(C[lower.tri(C)])-sd(C[lower.tri(C)]),mean(C[lower.tri(C)])+sd(C[lower.tri(C)]))
-          cosines = c(cosines,max(cos.range)) # grabs +1 SD from mean...
-        }
-    }  
-    return(cosines)
-}
+jids = as.numeric(names(sort(table(title$JID),decreasing=T)[30:100])) # get the most common journals
 
-# explore CogSci, JID = 47
-cogsci = getjournalcosines(47)
-# explore JEPLMC, JID = 4
-jeplmc = getjournalcosines(4)
-jeplmc = jeplmc[!is.na(jeplmc)]
-jdat = rbind(data.frame(j="jeplmc",cs=jeplmc),data.frame(j="cogsci",cs=cogsci))
-boxplot(jdat$cs~jdat$j)
+j_auth_cos = data.frame()
+
+system.time(for (jid in jids) {
+  print(paste('author by cosine processing: ',jid,journal[jid,]$name))
+  res = author_cosine_by_journal(jid,1)
+  j_auth_cos = rbind(j_auth_cos,data.frame(jid=jid,cos=res[,1],n=res[,2]))  
+});
+#boxplot(cos~jid,data=j_auth_cos[j_auth_cos$n>10,]) # boxplot by journal...
+#summary(lm(cos~as.factor(jid)*n,data=j_auth_cos[j_auth_cos$n>10,])) # does n predict cos? weakly
+#hist(j_auth_cos$cos,100)
+#jcosagg = aggregate(j_auth_cos[j_auth_cos$n>10,]$cos,by=list(j_auth_cos[j_auth_cos$n>10,]$jid),mean) # only journals with n > 10 articles in the results
+#jcosagg = sort(jcosagg$x,index.return=T)
+#plot(jcosagg$x,col='white',xlim=c(0,40)) # plot names of journals ranked with y = cosine (higher = more consistent authorship content)
+#text(1:length(jcosagg$ix)+1,jcosagg$x,labels=journal[jids,]$name,cex=.65)
+
+j_journ_cos = data.frame()
+
+system.time(for (jid in jids) {
+  print(paste('journal by content processing: ',jid,journal[jid,]$name))
+  res = journal_cosine_by_content(jid,1)
+  if (length(res)>0) {
+    j_journ_cos = rbind(j_journ_cos,data.frame(jid=jid,cos=res[,1],n=res[,2]))  
+  }
+});
+
+jcosagg = aggregate(j_journ_cos[j_journ_cos$n>10,]$cos,by=list(j_journ_cos[j_journ_cos$n>10,]$jid),mean) # only journals with n > 10 articles in the results
+jcosagg = sort(jcosagg$x,index.return=T)
+plot(jcosagg$x,col='white',xlim=c(0,40)) # plot names of journals ranked with y = cosine (higher = more consistent authorship content)
+text(1:length(jcosagg$ix)+1,jcosagg$x,labels=journal[jids,]$name,cex=.65)
+
+
 
 
