@@ -19,7 +19,7 @@ load('tXd.Rdata')
 library(irlba)
 S <<- irlba(tXd.mat,nu=25,nv=25) # very slow beyond 30 or so
 
-jids = as.numeric(names(sort(table(title$JID),decreasing=T)[30:40])) # get the most common journals
+jids = as.numeric(names(sort(table(title$JID),decreasing=T)[30:60])) # get the most common journals
 
 j_auth_cos = data.frame()
 
@@ -31,10 +31,10 @@ system.time(for (jid in jids) {
 #boxplot(cos~jid,data=j_auth_cos[j_auth_cos$n>10,]) # boxplot by journal...
 #summary(lm(cos~as.factor(jid)*n,data=j_auth_cos[j_auth_cos$n>10,])) # does n predict cos? weakly
 #hist(j_auth_cos$cos,100)
-jcosagg = aggregate(j_auth_cos[j_auth_cos$n>10,]$cos,by=list(j_auth_cos[j_auth_cos$n>10,]$jid),mean) # only journals with n > 10 articles in the results
-jcosagg = sort(jcosagg$x,index.return=T)
-plot(jcosagg$x,col='white',xlim=c(0,length(jids))) # plot names of journals ranked with y = cosine (higher = more consistent authorship content)
-text(1:length(jcosagg$ix)+1,jcosagg$x,labels=journal[jids,]$name,cex=.65)
+acosagg = aggregate(j_auth_cos[j_auth_cos$n>10,]$cos,by=list(j_auth_cos[j_auth_cos$n>10,]$jid),mean) # only journals with n > 10 articles in the results
+acosagg = sort(acosagg$x,index.return=T)
+plot(acosagg$x,col='white',xlim=c(0,length(jids))) # plot names of journals ranked with y = cosine (higher = more consistent authorship content)
+text(1:length(acosagg$ix)+1,acosagg$x,labels=journal[jids,]$name,cex=.65)
 
 j_journ_cos = data.frame()
 
@@ -50,6 +50,10 @@ jcosagg = aggregate(j_journ_cos[j_journ_cos$n>10,]$cos,by=list(j_journ_cos[j_jou
 jcosagg = sort(jcosagg$x,index.return=T)
 plot(jcosagg$x,col='white',xlim=c(0,length(jids))) # plot names of journals ranked with y = cosine (higher = more consistent authorship content)
 text(1:length(jcosagg$ix)+1,jcosagg$x,labels=journal[jids,]$name,cex=.65)
+
+plot(acosagg$x,jcosagg$x,col='white',xlim=c(0.1,.4),ylim=c(0,.4))
+text(acosagg$x,jcosagg$x,labels=journal[jids,]$name,cex=.65)
+
 
 
 
