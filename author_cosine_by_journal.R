@@ -14,7 +14,7 @@ author_cosine_by_journal = function(jid,validate) {
       n = nrow(X) 
       if (!is.null(n)) { # must have at least two articles to compare after removing empty abstracts
         cmb = expand.grid(i=1:n, j=1:n) 
-        C = matrix(apply(cmb,1,cos.sim),n,n) # get all pairwise cosine similarity measures
+        C = matrix(apply(cmb,1,cosine_similarity_matrix),n,n) # get all pairwise cosine similarity measures
         #cos.range = c(mean(C[lower.tri(C)])-sd(C[lower.tri(C)]),mean(C[lower.tri(C)])+sd(C[lower.tri(C)]))
         if (validate==1) { # let's check to see if similar abstracts do look similar; write to file, inspect
           high_cos = which(C>.95 & C<1,arr.ind=T) # very high cosine, but not 1

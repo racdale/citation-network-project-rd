@@ -5,6 +5,8 @@ journal_cosine_by_content = function(jid,validate) {
   for (j in artids) { # loop through all articles for this journal
     # get all the authors' titles; exclusive this journal article though
     titles = title[title$JID==j & title$TID!=j,]$TID
+    titles = sample(titles, min(25,length(titles)))
+    #print(titles)
     titles = titles[nchar(title[titles,]$abstract)>0]
     X <<- S$u[titles,] # u contains the documents (article abstracts)
     n = nrow(X) 
